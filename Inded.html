@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SkyGuide | Professional Edition</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root { 
+      --primary: #00a8ff; --accent: #6c5ce7; --dark: #0f172a; 
+      --card-bg: rgba(30, 41, 59, 0.5); --text: #ffffff;
+    }
+    .light-mode { --dark: #f1f5f9; --text: #1e293b; --card-bg: #ffffff; }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+    
+    body { 
+      background: var(--dark); color: var(--text); 
+      transition: 0.3s; min-height: 100vh; overflow-x: hidden;
+    }
+
+    /* --- STICKY TOP BAR --- */
+    .top-nav {
+      position: sticky; top: 0; z-index: 1001;
+      background: var(--dark); padding: 10px 15px;
+      display: flex; flex-direction: column; gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-weight: 800; color: var(--primary); font-size: 1.1rem; }
+
+    /* --- COMPACT SEARCH --- */
+    .search-bar { display: flex; gap: 8px; }
+    .search-bar input {
+      flex: 1; padding: 10px 15px; border-radius: 10px; border: none;
+      background: rgba(255,255,255,0.1); color: var(--text); outline: none; font-size: 0.9rem;
+    }
+    .btn-icon { width: 40px; height: 40px; border-radius: 10px; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    /* --- THE MAP (COMPACT) --- */
+    .map-box {
+      width: 100%; height: 220px; /* Reduced height for mobile */
+      margin: 10px 0; border-radius: 15px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    #map { height: 100%; width: 100%; }
+
+    /* --- CONTENT GRID --- */
+    .app-container { padding: 0 15px 30px; max-width: 1100px; margin: 0 auto; }
+
+    .main-card {
+      text-align: center; padding: 20px; border-radius: 20px;
+      background: var(--card-bg); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px;
+    }
+
+    .temp-display { font-size: 3.5rem; font-weight: 800; line-height: 1; margin: 10px 0; }
+    .weather-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+    .weather-info div { font-size: 0.7rem; opacity: 0.7; }
+    .weather-info b { display: block; font-size: 0.9rem; color: var(--primary); }
+
+    /* --- FORECAST (HORIZONTAL SCROLL) --- */
+    .section-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; opacity: 0.9; }
+    .scroll-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
+    .scroll-row::-webkit-scrollbar { display: none; }
+    
+    .f-card {
+      min-width: 75px; padding: 12px 5px; border-radius: 15px;
+      background: var(--card-bg); text-align: center; border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* --- LANDMARKS (GRID) --- */
+    .landmark-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .landmark-item { background: var(--card-bg); padding: 10px; border-radius: 12px; font-size: 0.75rem; display: flex; align-items: center; gap: 8px; }
+
+    /* --- DESKTOP ADJUSTMENTS --- */
+    @media (min-width: 768px) {
+      .app-layout { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+      .map-box { height: 400px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-nav">
+    <div class="header-row">
+      <div class="logo"><i class="fas fa-globe-americas"></i> SkyGuide</div>
+      <div onclick="document.body.classList.toggle('light-mode')"><i class="fas fa-moon"></i></div>
+    </div>
+    <div class="search-bar">
+      <input type="text" id="city-input" placeholder="Search City...">
+      <button class="btn-icon" style="background:var(--accent)" id="gps-btn"><i class="fas fa-location-arrow"></i></button>
+      <button class="btn-icon" style="background:var(--primary)" id="search-btn"><i class="fas fa-search"></i></button>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <div class="map-box"><div id="map"></div></div>
+
+    <div class="app-layout">
+      <div class="main-card">
+        <h2 id="city-name" style="font-size: 1.4rem;">Islamabad</h2>
+        <p id="date-text" style="opacity: 0.6; font-size: 0.75rem;">---</p>
+        <i class="fas fa-cloud-sun" id="main-icon" style="font-size: 60px; color: #fbc531; margin: 15px 0;"></i>
+        <div class="temp-display" id="temp">--°</div>
+        <p id="desc" style="text-transform: capitalize; font-size: 0.9rem; font-weight: 600;">---</p>
+        
+        <div class="weather-info">
+          <div>Hum<br><b id="hum">--</b></div>
+          <div>Wind<br><b id="wind">--</b></div>
+          <div>Pres<br><b id="press">--</b></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div>
+          <p class="section-title">5-Day Forecast</p>
+          <div class="scroll-row" id="forecast-list"></div>
+        </div>
+
+        <div>
+          <p class="section-title">Nearby Landmarks</p>
+          <div class="landmark-grid" id="landmark-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const apiKey = "f1ba35529aedc63d176b2e42fae71acf";
+    let map, marker;
+
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView([33.68, 73.04], 11);
+      L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'] }).addTo(map);
+      map.on('click', e => updateApp(null, e.latlng.lat, e.latlng.lng));
+    }
+
+    function updateApp(city = 'Islamabad', lat = null, lon = null) {
+      const q = city ? `q=${city}` : `lat=${lat}&lon=${lon}`;
+      
+      $.get(`https://api.openweathermap.org/data/2.5/weather?${q}&appid=${apiKey}&units=metric`, (data) => {
+        $('#city-name').text(data.name);
+        $('#temp').text(Math.round(data.main.temp) + '°C');
+        $('#desc').text(data.weather[0].description);
+        $('#hum').text(data.main.humidity + '%');
+        $('#wind').text(Math.round(data.wind.speed * 3.6) + 'km/h');
+        $('#press').text(data.main.pressure);
+        $('#date-text').text(new Date().toDateString());
+
+        map.flyTo([data.coord.lat, data.coord.lon], 12);
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([data.coord.lat, data.coord.lon]).addTo(map).bindPopup(data.name).openPopup();
+        
+        updatePlaces(data.name);
+        updateForecast(q);
+      });
+    }
+
+    function updateForecast(q) {
+      $.get(`https://api.openweathermap.org/data/2.5/forecast?${q}&appid=${apiKey}&units=metric`, (data) => {
+        const row = $('#forecast-list').empty();
+        data.list.filter(i => i.dt_txt.includes("12:00:00")).forEach(day => {
+          row.append(`<div class="f-card">
+            <div style="font-size: 0.65rem;">${new Date(day.dt*1000).toLocaleDateString('en',{weekday:'short'})}</div>
+            <i class="fas fa-cloud-sun" style="color:var(--primary); font-size: 1.2rem; margin:8px 0;"></i>
+            <div style="font-weight:700">${Math.round(day.main.temp)}°</div>
+          </div>`);
+        });
+      });
+    }
+
+    function updatePlaces(city) {
+      const list = $('#landmark-list').empty();
+      const places = ["Historical Site", "City Center", "Famous Park", "Skyline Point"];
+      places.forEach(p => list.append(`<div class="landmark-item"><i class="fas fa-map-pin" style="color:var(--primary)"></i> ${p}</div>`));
+    }
+
+    $('#search-btn').click(() => updateApp($('#city-input').val()));
+    $('#gps-btn').click(() => navigator.geolocation.getCurrentPosition(p => updateApp(null, p.coords.latitude, p.coords.longitude)));
+
+    $(document).ready(() => { initMap(); updateApp(); });
+  </script>
+</body>
+</html>
